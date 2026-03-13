@@ -7,31 +7,7 @@ import FactorsGrid from './components/FactorsGrid'
 import NewsSection from './components/NewsSection'
 import SummaryBox from './components/SummaryBox'
 import ActionBar from './components/ActionBar'
-
-const DUMMY = {
-  supplierName: 'Tata Steel Limited',
-  country: 'India',
-  industry: 'Steel & Mining',
-  overallScore: 78,
-  verdict: 'APPROVED',
-  verdictReason: 'Strong financials with minor ESG concerns',
-  summary: 'Tata Steel is one of the largest steel producers globally with a strong balance sheet and consistent revenue growth. Credit risk is low with investment-grade ratings. Minor ESG concerns exist around carbon emissions but improvement roadmaps are in place. Overall recommended for onboarding with standard contract terms.',
-  factors: [
-    { name: 'Annual Turnover',    icon: '💰', value: '₹2.43L Cr',     detail: 'Consistent revenue growth over 5 years',              status: 'green', score: 88 },
-    { name: 'Financial Health',   icon: '📊', value: 'Strong',         detail: 'Healthy EBITDA margins and positive cash flow',       status: 'green', score: 82 },
-    { name: 'Credit Risk',        icon: '🏦', value: 'BBB+ Rated',     detail: 'Investment grade with stable outlook',                status: 'green', score: 79 },
-    { name: 'Legal & Compliance', icon: '⚖️', value: 'Minor Issues',   detail: 'A few pending regulatory matters, none critical',     status: 'amber', score: 55 },
-    { name: 'ESG Score',          icon: '🌱', value: 'Medium',         detail: 'Carbon reduction targets set, progress ongoing',      status: 'amber', score: 60 },
-    { name: 'Market Reputation',  icon: '⭐', value: 'Market Leader',  detail: 'Top 3 global steel brand, strong client trust',       status: 'green', score: 91 },
-  ],
-  news: [
-    { headline: 'Tata Steel reports record quarterly profit driven by European operations', source: 'Economic Times · Jan 2025',  sentiment: 'positive' },
-    { headline: 'Tata Steel commits to net-zero carbon emissions by 2045',                 source: 'Business Standard · Dec 2024', sentiment: 'positive' },
-    { headline: 'Minor regulatory notice issued to Jamshedpur plant over emissions',       source: 'Reuters · Nov 2024',           sentiment: 'negative' },
-    { headline: 'Tata Steel wins supplier excellence award from JLR',                      source: 'Hindu BusinessLine · Oct 2024',sentiment: 'positive' },
-    { headline: 'Steel sector faces headwinds from global demand slowdown',                source: 'Mint · Oct 2024',              sentiment: 'neutral'  },
-  ]
-}
+import { assessSupplier } from './services/openai'
 
 function App() {
   const [supplierName, setSupplierName] = useState('')
@@ -40,25 +16,35 @@ function App() {
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!supplierName.trim()) return
+
     setResult(null)
     setError('')
     setLoading(true)
     setLoadingStep(1)
 
+    // Animate loading steps while API call runs
     let step = 1
     const timer = setInterval(() => {
       step++
       setLoadingStep(step)
-      if (step >= 5) {
-        clearInterval(timer)
-        setTimeout(() => {
-          setLoading(false)
-          setResult(DUMMY)
-        }, 800)
-      }
-    }, 700)
+      if (step >= 4) clearInterval(timer)
+    }, 1000)
+
+    try {
+      const data = await assessSupplier(supplierName)
+      clearInterval(timer)
+      setLoadingStep(5)
+      setTimeout(() => {
+        setLoading(false)
+        setResult(data)
+      }, 600)
+    } catch (err) {
+      clearInterval(timer)
+      setLoading(false)
+      setError(err.message)
+    }
   }
 
   const handleClear = () => {
@@ -70,12 +56,14 @@ function App() {
   return (
     <div className="shell">
       <Header />
+
       <SearchBar
         value={supplierName}
         onChange={setSupplierName}
         onSearch={handleSearch}
         loading={loading}
       />
+
       <LoadingPanel active={loading} currentStep={loadingStep} />
 
       {error && (
