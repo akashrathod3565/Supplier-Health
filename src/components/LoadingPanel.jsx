@@ -1,9 +1,9 @@
 const steps = [
-  'Searching web for supplier profile',
-  'Fetching financial data & turnover',
-  'Scanning latest news & sentiment',
-  'Evaluating compliance & legal flags',
-  'Computing risk score & recommendation'
+  'Searching web for company overview & financials',
+  'Scanning latest news and market signals',
+  'Checking legal, compliance & ESG data',
+  'Sending intelligence to GPT-4o for analysis',
+  'Building risk assessment report'
 ]
 
 function LoadingPanel({ active, currentStep }) {
