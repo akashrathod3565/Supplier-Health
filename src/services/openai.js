@@ -5,10 +5,22 @@ export async function assessSupplier(supplierName) {
     body: JSON.stringify({ supplierName })
   })
 
-  if (!response.ok) {
-    const err = await response.json()
-    throw new Error(err.error || 'Assessment failed')
+  const text = await response.text()
+
+  if (!text || text.trim() === '') {
+    throw new Error('Server returned empty response — likely a timeout. Please try again.')
   }
 
-  return response.json()
+  let data
+  try {
+    data = JSON.parse(text)
+  } catch (e) {
+    throw new Error('Invalid response from server. Please try again.')
+  }
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Assessment failed')
+  }
+
+  return data
 }
