@@ -4,6 +4,7 @@ import SearchBar from './components/SearchBar'
 import LoadingPanel from './components/LoadingPanel'
 import VerdictBanner from './components/VerdictBanner'
 import CompanyProfile from './components/CompanyProfile'
+import ScoreBreakdown from './components/ScoreBreakdown'
 import FactorsGrid from './components/FactorsGrid'
 import NewsSection from './components/NewsSection'
 import SummaryBox from './components/SummaryBox'
@@ -87,6 +88,10 @@ function App() {
           />
           <CompanyProfile data={result} />
           <SummaryBox summary={result.summary} />
+          <ScoreBreakdown
+            factors={result.factors}
+            overallScore={result.overallScore}
+          />
           <FactorsGrid factors={result.factors} />
           <NewsSection news={result.news} />
           <ActionBar
