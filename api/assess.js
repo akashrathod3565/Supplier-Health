@@ -9,8 +9,42 @@ export default async function handler(req, res) {
   }
 
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY
+  const TAVILY_API_KEY = process.env.TAVILY_API_KEY
 
   try {
+    // Single fast Tavily search for latest context only
+    let recentContext = ''
+    try {
+      const tavilyRes = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_key: TAVILY_API_KEY,
+          query: `${supplierName} 2024 2025 revenue news financial results`,
+          max_results: 3,
+          search_depth: 'basic',
+          include_answer: true
+        })
+      })
+      const tavilyData = await tavilyRes.json()
+
+      // Extract only the answer + top 3 titles — keep it tiny
+      const answer = tavilyData.answer
+        ? `Latest summary: ${tavilyData.answer}\n`
+        : ''
+      const headlines = (tavilyData.results || [])
+        .slice(0, 3)
+        .map(r => `- ${r.title}`)
+        .join('\n')
+      recentContext = answer + headlines
+
+    } catch (e) {
+      // If Tavily fails, continue without it
+      recentContext = 'No recent web data available.'
+    }
+
+    const currentYear = new Date().getFullYear()
+
     const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -24,48 +58,55 @@ export default async function handler(req, res) {
         messages: [
           {
             role: 'system',
-            content: `You are a senior procurement risk analyst with deep knowledge of global companies. 
-Given a supplier name, return a thorough risk assessment as ONLY valid JSON. 
-No markdown, no explanation, no preamble — only the raw JSON object.`
+            content: `You are a senior procurement risk analyst. 
+The current year is ${currentYear}.
+Use the most recent data available — prioritize ${currentYear} and 2024 figures over older data.
+Return ONLY valid JSON, no markdown, no explanation.`
           },
           {
             role: 'user',
-            content: `Assess this supplier for procurement onboarding: "${supplierName}"
+            content: `Assess this supplier: "${supplierName}"
 
-Return ONLY this exact JSON structure:
+LATEST WEB INTELLIGENCE (${currentYear}):
+${recentContext}
+
+Use the above recent data combined with your knowledge to return the most up-to-date assessment possible.
+Prioritize ${currentYear} revenue, headcount, and news. If ${currentYear} data is unavailable use 2024.
+
+Return ONLY this exact JSON:
 {
   "supplierName": "Official full company name",
   "country": "HQ country",
   "industry": "Industry sector",
   "founded": "Year founded",
-  "employees": "Approximate employee count e.g. 3,35,000+",
+  "employees": "Most recent employee count e.g. 3,35,000+ (${currentYear})",
   "headquarters": "City, State, Country",
-  "cin": "CIN if Indian company e.g. L17110MH1973PLC019786, else N/A",
+  "cin": "CIN if Indian company else N/A",
   "website": "Official website URL",
   "contactEmail": "Official contact email if known else N/A",
   "contactPhone": "Official phone number if known else N/A",
   "boardMembers": [
-    { "name": "Full Name", "designation": "Title e.g. Chairman & MD" },
-    { "name": "Full Name", "designation": "CEO & MD" },
-    { "name": "Full Name", "designation": "Independent Director" }
+    { "name": "Full Name", "designation": "Current title as of ${currentYear}" },
+    { "name": "Full Name", "designation": "Current title" },
+    { "name": "Full Name", "designation": "Current title" }
   ],
-  "overallScore": <number 0-100, 100 = lowest risk>,
+  "overallScore": <number 0-100>,
   "verdict": "APPROVED",
-  "verdictReason": "One concise sentence explaining verdict",
-  "summary": "3-4 sentence executive summary covering financials, risk profile, reputation and recommendation",
+  "verdictReason": "One concise sentence with current context",
+  "summary": "3-4 sentences using most recent ${currentYear}/2024 data available",
   "factors": [
-    { "name": "Annual Turnover",    "icon": "💰", "value": "Real revenue figure",      "detail": "Revenue trend and scale",          "status": "green", "score": 85 },
-    { "name": "Financial Health",   "icon": "📊", "value": "Strong / Stable / Weak",   "detail": "Profitability and balance sheet",  "status": "green", "score": 80 },
-    { "name": "Credit Risk",        "icon": "🏦", "value": "Rating or risk level",     "detail": "Credit standing and stability",    "status": "green", "score": 75 },
-    { "name": "Legal & Compliance", "icon": "⚖️", "value": "Clean / Minor / Major",    "detail": "Litigation and compliance status", "status": "green", "score": 90 },
-    { "name": "ESG Score",          "icon": "🌱", "value": "High / Medium / Low",      "detail": "Environmental and governance",     "status": "amber", "score": 60 },
-    { "name": "Market Reputation",  "icon": "⭐", "value": "Market standing",          "detail": "Brand strength and trust",         "status": "green", "score": 88 }
+    { "name": "Annual Turnover",    "icon": "💰", "value": "Most recent revenue figure with year",  "detail": "Revenue trend using latest data",          "status": "green", "score": 85 },
+    { "name": "Financial Health",   "icon": "📊", "value": "Strong / Stable / Weak",                "detail": "Latest profitability and balance sheet",   "status": "green", "score": 80 },
+    { "name": "Credit Risk",        "icon": "🏦", "value": "Current rating or risk level",          "detail": "Most recent credit standing",              "status": "green", "score": 75 },
+    { "name": "Legal & Compliance", "icon": "⚖️", "value": "Clean / Minor Issues / Major Issues",   "detail": "Current legal and compliance status",      "status": "green", "score": 90 },
+    { "name": "ESG Score",          "icon": "🌱", "value": "High / Medium / Low",                   "detail": "Latest ESG initiatives and rating",        "status": "amber", "score": 60 },
+    { "name": "Market Reputation",  "icon": "⭐", "value": "Current market standing",               "detail": "Recent brand signals and trust indicators","status": "green", "score": 88 }
   ],
   "news": [
-    { "headline": "Realistic recent headline about this company", "source": "Publication · Year", "sentiment": "positive" },
-    { "headline": "Realistic recent headline about this company", "source": "Publication · Year", "sentiment": "neutral" },
-    { "headline": "Realistic recent headline about this company", "source": "Publication · Year", "sentiment": "negative" },
-    { "headline": "Realistic recent headline about this company", "source": "Publication · Year", "sentiment": "positive" }
+    { "headline": "Most recent headline from ${currentYear} or 2024", "source": "Publication · ${currentYear}", "sentiment": "positive" },
+    { "headline": "Recent headline",                                   "source": "Publication · 2024",          "sentiment": "neutral"  },
+    { "headline": "Recent headline",                                   "source": "Publication · 2024",          "sentiment": "negative" },
+    { "headline": "Recent headline",                                   "source": "Publication · 2024",          "sentiment": "positive" }
   ]
 }
 
@@ -73,9 +114,9 @@ Rules:
 - verdict: "APPROVED"(65-100), "CONDITIONAL"(40-64), "REJECTED"(0-39)
 - status: "green", "amber", or "red" only
 - sentiment: "positive", "neutral", or "negative" only
-- boardMembers: 3-5 real members with accurate designations
-- cin: real CIN for Indian listed companies
-- Return ONLY the JSON, nothing else`
+- boardMembers: 3-5 current members as of ${currentYear}
+- Always mention the year next to revenue figures
+- Return ONLY the JSON`
           }
         ]
       })
