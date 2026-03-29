@@ -1,7 +1,3 @@
-// ══════════════════════════════════════════════════════════
-// SUPPLIERIQ — CLIENT-SIDE SCORING & CREDIBILITY ENGINE
-// ══════════════════════════════════════════════════════════
-
 const WEIGHTS = {
   'Financial Health':   0.25,
   'Annual Turnover':    0.20,
@@ -11,11 +7,11 @@ const WEIGHTS = {
   'ESG Score':          0.05
 }
 
-export async function assessSupplier(supplierName) {
+export async function assessSupplier(supplierName, deepSearch = false, uploadedText = null) {
   const response = await fetch('/api/assess', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ supplierName })
+    body: JSON.stringify({ supplierName, deepSearch, uploadedText })
   })
 
   const text = await response.text()
@@ -34,32 +30,31 @@ export async function assessSupplier(supplierName) {
     throw new Error(data.error || 'Assessment failed')
   }
 
-  // ── 1. Resolve sourceIndex into a lookup map: SRC01 → {url, title, domain}
+  // Resolve sourceIndex into lookup map
   const sourceMap = {}
   ;(data.sourceIndex || []).forEach(s => { sourceMap[s.id] = s })
   data.sourceMap = sourceMap
 
-  // ── 2. Client-side weighted scoring (overrides GPT's placeholder 0)
+  // Client-side weighted scoring
   const scored = calculateWeightedScore(data.factors)
   data.overallScore = scored.total
   data.scoreBreakdown = scored.breakdown
 
-  // ── 3. Recalculate verdict from computed score
+  // Recalculate verdict
   data.verdict = deriveVerdict(data.overallScore)
 
-  // ── 4. Normalize factor status to match computed scores
+  // Normalize factor status
   data.factors = data.factors.map(f => ({
     ...f,
     status: scoreToStatus(f.score),
-    // Resolve sourceId → full source object for display
     source: f.sourceId ? sourceMap[f.sourceId] : null
   }))
 
-  // ── 5. Staleness: mark stale factors/fields (server sends staleFields array)
+  // Staleness flags
   const staleFieldNames = new Set((data.staleFields || []).map(s => s.field))
   data.hasStaleData = staleFieldNames.size > 0
 
-  // ── 6. Unknown company detection — override alert if needed
+  // Unknown company detection
   if (!data.reliabilityAlert && data.reliabilityTier === 'limited') {
     data.reliabilityAlert = 'LIMITED PUBLIC DATA: Manual verification strongly recommended before onboarding.'
   }
@@ -67,7 +62,7 @@ export async function assessSupplier(supplierName) {
     data.reliabilityAlert = 'INSUFFICIENT PUBLIC DATA: This assessment is largely estimated. Independent verification is mandatory.'
   }
 
-  // ── 7. Resolve news URLs from sourceIndex
+  // Resolve news URLs
   data.news = (data.news || []).map(n => ({
     ...n,
     resolvedSource: n.sourceId ? sourceMap[n.sourceId] : null
@@ -76,7 +71,6 @@ export async function assessSupplier(supplierName) {
   return data
 }
 
-// ── Weighted scoring ──────────────────────────────────────
 function calculateWeightedScore(factors) {
   let totalScore = 0
   let totalWeight = 0

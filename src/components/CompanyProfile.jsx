@@ -15,11 +15,8 @@ function InfoItem({ label, value, isLink, confidence, sourceId, sourceMap, stale
   const inner = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
       <div style={{
-        fontFamily: 'DM Mono, monospace',
-        fontSize: '10px',
-        color: 'var(--text3)',
-        letterSpacing: '1px',
-        textTransform: 'uppercase'
+        fontFamily: 'DM Mono, monospace', fontSize: '10px',
+        color: 'var(--text3)', letterSpacing: '1px', textTransform: 'uppercase'
       }}>
         {label}
       </div>
@@ -40,7 +37,6 @@ function InfoItem({ label, value, isLink, confidence, sourceId, sourceMap, stale
       </a>
     )
   }
-
   return inner
 }
 
@@ -51,10 +47,8 @@ function TagList({ items, color }) {
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
       {items.map((item, i) => (
         <span key={i} style={{
-          fontFamily: 'DM Mono, monospace',
-          fontSize: '11px',
-          padding: '4px 10px',
-          borderRadius: '20px',
+          fontFamily: 'DM Mono, monospace', fontSize: '11px',
+          padding: '4px 10px', borderRadius: '20px',
           background: color ? `${color}15` : 'var(--surface2)',
           color: color || 'var(--text2)',
           border: `1px solid ${color ? `${color}30` : 'var(--border)'}`,
@@ -75,121 +69,109 @@ function CompanyProfile({ data }) {
 
   const supplierTypeColor = {
     'Large Enterprise': 'var(--green)',
-    'SME':              'var(--accent)',
-    'MSME':             'var(--amber)',
+    'SME': 'var(--accent)',
+    'MSME': 'var(--amber)',
     'Micro Enterprise': 'var(--amber)',
-    'Startup':          'var(--accent2)'
+    'Startup': 'var(--accent2)'
   }
 
   const validBoardMembers = (data.boardMembers || []).filter(m =>
     m.name && m.name !== 'Not found' && m.name !== 'Not publicly available' && m.name.trim() !== ''
   )
 
+  const hasCharges = data.charges && data.charges !== 'None found' && data.charges !== 'Not found'
+
   return (
     <div style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: '12px',
-      padding: '20px',
-      marginBottom: '24px'
+      background: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: '12px', padding: '20px', marginBottom: '24px'
     }}>
 
       {/* Header */}
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: '20px',
-        flexWrap: 'wrap',
-        gap: '10px'
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: '20px', flexWrap: 'wrap', gap: '10px'
       }}>
         <div style={{
-          fontFamily: 'DM Mono, monospace',
-          fontSize: '10px',
-          color: 'var(--accent)',
-          letterSpacing: '1.5px',
-          textTransform: 'uppercase'
+          fontFamily: 'DM Mono, monospace', fontSize: '10px',
+          color: 'var(--accent)', letterSpacing: '1.5px', textTransform: 'uppercase'
         }}>
           🏢 COMPANY PROFILE
         </div>
         {data.supplierType && (
           <span style={{
-            fontFamily: 'DM Mono, monospace',
-            fontSize: '10px',
+            fontFamily: 'DM Mono, monospace', fontSize: '10px',
             color: supplierTypeColor[data.supplierType] || 'var(--text2)',
             background: 'var(--surface2)',
             border: `1px solid ${supplierTypeColor[data.supplierType] || 'var(--border)'}`,
-            padding: '3px 10px',
-            borderRadius: '20px'
+            padding: '3px 10px', borderRadius: '20px'
           }}>
             {data.supplierType}
           </span>
         )}
       </div>
 
+      {/* Active charges alert */}
+      {hasCharges && (
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: '10px',
+          background: 'rgba(239,68,68,0.06)',
+          border: '1px solid rgba(239,68,68,0.25)',
+          borderRadius: '8px', padding: '10px 14px', marginBottom: '20px'
+        }}>
+          <span style={{ fontSize: '14px', flexShrink: 0 }}>⚠️</span>
+          <div>
+            <div style={{
+              fontFamily: 'DM Mono, monospace', fontSize: '10px',
+              color: 'var(--red)', letterSpacing: '1px', marginBottom: '4px'
+            }}>
+              ACTIVE CHARGES / LIENS DETECTED
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text2)', fontWeight: '300', lineHeight: '1.5' }}>
+              {data.charges} — Verify directly on MCA21 before onboarding.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Core Info Grid */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-        gap: '20px',
-        marginBottom: '24px',
-        paddingBottom: '24px',
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+        gap: '20px', marginBottom: '24px', paddingBottom: '24px',
         borderBottom: '1px solid var(--border)'
       }}>
-        <InfoItem label="Headquarters"   value={data.headquarters} />
+        <InfoItem label="Headquarters" value={data.headquarters} />
         <InfoItem label="Registered Office" value={data.registeredOffice} />
-        <InfoItem
-          label="Employees"
-          value={data.employees}
-          stale={staleSet.has('Employees')}
-          dataYear={staleYearMap['Employees']}
-        />
+        <InfoItem label="Employees" value={data.employees}
+          stale={staleSet.has('Employees')} dataYear={staleYearMap['Employees']} />
         <InfoItem label="Founded" value={data.founded} />
-        <InfoItem
-          label="Annual Revenue"
-          value={data.annualRevenue}
+        <InfoItem label="Annual Revenue" value={data.annualRevenue}
           confidence={data.annualRevenueConfidence}
-          sourceId={data.annualRevenueSourceId}
-          sourceMap={sourceMap}
-          stale={staleSet.has('Annual Revenue')}
-          dataYear={staleYearMap['Annual Revenue']}
-        />
-        <InfoItem
-          label="Market Cap"
-          value={data.marketCap}
-          stale={staleSet.has('Market Cap')}
-          dataYear={staleYearMap['Market Cap']}
-        />
+          sourceId={data.annualRevenueSourceId} sourceMap={sourceMap}
+          stale={staleSet.has('Annual Revenue')} dataYear={staleYearMap['Annual Revenue']} />
+        <InfoItem label="Market Cap" value={data.marketCap}
+          stale={staleSet.has('Market Cap')} dataYear={staleYearMap['Market Cap']} />
         <InfoItem label="Stock Exchange" value={data.stockExchange} />
         <InfoItem label="Parent Company" value={data.parentCompany} />
       </div>
 
-      {/* Registration Info */}
+      {/* Registration Info — now includes charges & last filing */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-        gap: '20px',
-        marginBottom: '24px',
-        paddingBottom: '24px',
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+        gap: '20px', marginBottom: '24px', paddingBottom: '24px',
         borderBottom: '1px solid var(--border)'
       }}>
-        <InfoItem
-          label="CIN Number"
-          value={data.cin}
-          confidence={data.cinConfidence}
-          sourceId={data.cinSourceId}
-          sourceMap={sourceMap}
-        />
-        <InfoItem
-          label="GST Number"
-          value={data.gstNumber}
-          confidence={data.gstConfidence}
-          sourceId={data.gstSourceId}
-          sourceMap={sourceMap}
-        />
-        <InfoItem label="Udyam Number"  value={data.udyamNumber} />
-        <InfoItem label="Website"       value={data.website}      isLink />
-        <InfoItem label="LinkedIn"      value={data.linkedin}     isLink />
+        <InfoItem label="CIN Number" value={data.cin}
+          confidence={data.cinConfidence} sourceId={data.cinSourceId} sourceMap={sourceMap} />
+        <InfoItem label="GST Number" value={data.gstNumber}
+          confidence={data.gstConfidence} sourceId={data.gstSourceId} sourceMap={sourceMap} />
+        <InfoItem label="Udyam Number" value={data.udyamNumber} />
+        <InfoItem label="Active Charges" value={data.charges}
+          sourceId={data.chargesSourceId} sourceMap={sourceMap} />
+        <InfoItem label="Last MCA Filing" value={data.lastFilingDate}
+          sourceId={data.lastFilingSourceId} sourceMap={sourceMap} />
+        <InfoItem label="Website" value={data.website} isLink />
+        <InfoItem label="LinkedIn" value={data.linkedin} isLink />
         <InfoItem label="Contact Email" value={data.contactEmail} />
         <InfoItem label="Contact Phone" value={data.contactPhone} />
       </div>
@@ -199,9 +181,7 @@ function CompanyProfile({ data }) {
         <div style={{
           fontFamily: 'DM Mono, monospace', fontSize: '10px', color: 'var(--text3)',
           letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '12px'
-        }}>
-          🛠 KEY PRODUCTS & SERVICES
-        </div>
+        }}>🛠 KEY PRODUCTS & SERVICES</div>
         <TagList items={data.keyProducts} color="var(--accent)" />
       </div>
 
@@ -210,9 +190,7 @@ function CompanyProfile({ data }) {
         <div style={{
           fontFamily: 'DM Mono, monospace', fontSize: '10px', color: 'var(--text3)',
           letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '12px'
-        }}>
-          🏅 CERTIFICATIONS
-        </div>
+        }}>🏅 CERTIFICATIONS</div>
         <TagList items={data.certifications} color="var(--green)" />
       </div>
 
@@ -222,40 +200,29 @@ function CompanyProfile({ data }) {
           <div style={{
             fontFamily: 'DM Mono, monospace', fontSize: '10px', color: 'var(--text3)',
             letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '12px'
-          }}>
-            🤝 MAJOR CLIENTS
-          </div>
+          }}>🤝 MAJOR CLIENTS</div>
           <TagList items={data.majorClients} color="var(--amber)" />
         </div>
       )}
 
       {/* Board of Directors */}
-      <div style={{ marginBottom: validBoardMembers.length > 0 ? '20px' : '0' }}>
+      <div>
         <div style={{
           fontFamily: 'DM Mono, monospace', fontSize: '10px', color: 'var(--text3)',
           letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '14px'
-        }}>
-          👥 BOARD OF DIRECTORS
-        </div>
+        }}>👥 BOARD OF DIRECTORS</div>
         {validBoardMembers.length > 0 ? (
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-            gap: '10px'
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '10px'
           }}>
             {validBoardMembers.map((member, i) => (
               <div key={i} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                background: 'var(--surface2)',
-                border: '1px solid var(--border)',
-                borderRadius: '10px',
-                padding: '12px 14px'
+                display: 'flex', alignItems: 'center', gap: '12px',
+                background: 'var(--surface2)', border: '1px solid var(--border)',
+                borderRadius: '10px', padding: '12px 14px'
               }}>
                 <div style={{
-                  width: '36px', height: '36px',
-                  borderRadius: '50%',
+                  width: '36px', height: '36px', borderRadius: '50%',
                   background: 'linear-gradient(135deg, var(--accent), var(--accent2))',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontFamily: 'Syne, sans-serif', fontWeight: '700', fontSize: '13px',
@@ -290,18 +257,13 @@ function CompanyProfile({ data }) {
       {/* Data Warnings */}
       {data.dataWarnings?.length > 0 && (
         <div style={{
-          marginTop: '20px',
-          background: 'rgba(245,158,11,0.06)',
-          border: '1px solid rgba(245,158,11,0.2)',
-          borderRadius: '8px',
-          padding: '14px 16px'
+          marginTop: '20px', background: 'rgba(245,158,11,0.06)',
+          border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px', padding: '14px 16px'
         }}>
           <div style={{
-            fontFamily: 'DM Mono, monospace', fontSize: '10px', color: 'var(--amber)',
-            letterSpacing: '1px', marginBottom: '8px'
-          }}>
-            ⚠ DATA NOTES
-          </div>
+            fontFamily: 'DM Mono, monospace', fontSize: '10px',
+            color: 'var(--amber)', letterSpacing: '1px', marginBottom: '8px'
+          }}>⚠ DATA NOTES</div>
           {data.dataWarnings.map((w, i) => (
             <div key={i} style={{
               fontSize: '12px', color: 'var(--text2)', marginBottom: '4px',
@@ -313,7 +275,6 @@ function CompanyProfile({ data }) {
           ))}
         </div>
       )}
-
     </div>
   )
 }

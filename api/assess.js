@@ -3,7 +3,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { supplierName } = req.body
+  const { supplierName, deepSearch, uploadedText } = req.body
   if (!supplierName) {
     return res.status(400).json({ error: 'supplierName is required' })
   }
@@ -11,66 +11,100 @@ export default async function handler(req, res) {
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY
   const TAVILY_API_KEY = process.env.TAVILY_API_KEY
 
+  // deepSearch toggle: 'advanced' gives richer results, 'basic' is faster
+  const searchDepth = deepSearch ? 'advanced' : 'basic'
+  // increase results from 5 → 10 for much better coverage
+  const maxResults = deepSearch ? 10 : 7
+
   try {
-    // ─── TAVILY: 4 parallel searches, preserve URLs per result ───────────────
+    // ─── TAVILY: 5 parallel searches (was 4) ─────────────────────────────────
     let recentContext = ''
-    let sourceIndex = []   // [{id, url, title, domain}] passed to GPT for citation
+    let sourceIndex = []
 
     try {
-      const [globalRes, indiaRes, leadershipRes, financialRes] = await Promise.all([
+      const [globalRes, indiaRes, leadershipRes, financialRes, registryRes] = await Promise.all([
+
+        // 1. Global overview
         fetch('https://api.tavily.com/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             api_key: TAVILY_API_KEY,
             query: `${supplierName} company overview headquarters website employees founded history`,
-            max_results: 5, search_depth: 'basic', include_answer: true
+            max_results: maxResults,
+            search_depth: searchDepth,
+            include_answer: true
           })
         }),
+
+        // 2. India-specific
         fetch('https://api.tavily.com/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             api_key: TAVILY_API_KEY,
             query: `${supplierName} India CIN MCA GST registration address contact phone email`,
-            max_results: 5, search_depth: 'basic', include_answer: true
+            max_results: maxResults,
+            search_depth: searchDepth,
+            include_answer: true
           })
         }),
+
+        // 3. Leadership
         fetch('https://api.tavily.com/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             api_key: TAVILY_API_KEY,
             query: `${supplierName} CEO MD director board members leadership management team`,
-            max_results: 5, search_depth: 'basic', include_answer: true
+            max_results: maxResults,
+            search_depth: searchDepth,
+            include_answer: true
           })
         }),
+
+        // 4. Financials, compliance, red flags
         fetch('https://api.tavily.com/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             api_key: TAVILY_API_KEY,
             query: `${supplierName} revenue turnover annual report 2024 2025 financial results clients certifications fraud litigation blacklist`,
-            max_results: 5, search_depth: 'basic', include_answer: true
+            max_results: maxResults,
+            search_depth: searchDepth,
+            include_answer: true
+          })
+        }),
+
+        // 5. NEW — Indian registry deep dive: MCA21, Zauba, Screener, Tofler
+        fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key: TAVILY_API_KEY,
+            query: `"${supplierName}" site:zaubacorp.com OR site:screener.in OR site:tofler.in OR site:mca.gov.in CIN directors charges annual filing`,
+            max_results: maxResults,
+            search_depth: searchDepth,
+            include_answer: true
           })
         })
       ])
 
-      const [globalData, indiaData, leadershipData, financialData] = await Promise.all([
-        globalRes.json(), indiaRes.json(), leadershipRes.json(), financialRes.json()
+      const [globalData, indiaData, leadershipData, financialData, registryData] = await Promise.all([
+        globalRes.json(), indiaRes.json(), leadershipRes.json(), financialRes.json(), registryRes.json()
       ])
 
-      // Build numbered source index — GPT cites these IDs
+      // Build numbered source index
       let srcId = 1
       const buildSection = (data, sectionLabel) => {
         const answer = data.answer ? `Summary: ${data.answer}\n` : ''
-        const lines = (data.results || []).slice(0, 5).map(r => {
+        const lines = (data.results || []).slice(0, maxResults).map(r => {
           const id = `SRC${String(srcId).padStart(2, '0')}`
           let domain = r.url
           try { domain = new URL(r.url).hostname.replace('www.', '') } catch {}
           sourceIndex.push({ id, url: r.url, title: r.title, domain })
           srcId++
-          return `[${id}] ${r.title} (${domain}): ${r.content?.slice(0, 300)}`
+          return `[${id}] ${r.title} (${domain}): ${r.content?.slice(0, 400)}`
         }).join('\n')
         return `${sectionLabel}:\n${answer}${lines}`
       }
@@ -79,11 +113,17 @@ export default async function handler(req, res) {
         buildSection(globalData,     'COMPANY OVERVIEW & HQ'),
         buildSection(indiaData,      'INDIA REGISTRY (MCA/GST/CIN)'),
         buildSection(leadershipData, 'LEADERSHIP & BOARD'),
-        buildSection(financialData,  'FINANCIALS, CLIENTS, COMPLIANCE & RED FLAGS')
+        buildSection(financialData,  'FINANCIALS, CLIENTS, COMPLIANCE & RED FLAGS'),
+        buildSection(registryData,   'REGISTRY DEEP DIVE (Zauba/Screener/Tofler/MCA21)')
       ].join('\n\n')
 
     } catch (e) {
       recentContext = 'Web search unavailable — using training knowledge only.'
+    }
+
+    // ─── If user uploaded a document, append it as context ───────────────────
+    if (uploadedText && uploadedText.trim().length > 0) {
+      recentContext += `\n\nUSER-UPLOADED DOCUMENT CONTEXT:\n${uploadedText.slice(0, 8000)}`
     }
 
     const currentYear = new Date().getFullYear()
@@ -100,7 +140,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'gpt-4o',
         temperature: 0.1,
-        max_tokens: 4500,
+        max_tokens: 5000,
         messages: [
           {
             role: 'system',
@@ -117,6 +157,10 @@ Every field or factor that uses data from the web search results MUST cite the s
 Set "sourceId": "SRCxx" when a web result informed the value.
 Set "sourceId": null when data comes solely from training knowledge.
 
+You now have a dedicated REGISTRY DEEP DIVE section from Zauba, Screener, Tofler and MCA21.
+Prioritise data from these registry sources for CIN, GST, directors, charges and annual filings.
+These registry sources carry the highest credibility for Indian company data.
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SYSTEM 2 — CONFIDENCE SCORING
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -129,50 +173,33 @@ Hard rules:
 - CIN, GST, phone numbers → confidence "high" ONLY if found in a web result. Otherwise value="Not found", confidence="low"
 - Revenue for private/unlisted SMEs → confidence "low" unless a web result confirms it
 - Board members for small unknown companies → confidence "low" unless in web results
-- Any field where you are filling in a gap → confidence "low" or "medium", never "high"
+- Registry sources (Zauba, Screener, Tofler, MCA21) count as "high" confidence
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SYSTEM 3 — PRIMARY SOURCE VERIFY LINKS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Always populate verifyLinks with authoritative government/exchange portals for human cross-checking.
-Standard links to always include for Indian companies:
-  - MCA21 company search: https://www.mca.gov.in/mcafoportal/viewCompanyMasterData.do
-  - GST search: https://services.gst.gov.in/services/searchtp
-  - Zauba/company data: https://www.zaubacorp.com/company-search
-For listed companies add:
-  - BSE filings: https://www.bseindia.com/corporates/List_Scrips.html
-  - NSE filings: https://www.nseindia.com/companies-listing/corporate-filings-board-meetings
-These are NOT AI data — they are official portals for independent verification.
+Always populate verifyLinks with authoritative government/exchange portals:
+  - MCA21: https://www.mca.gov.in/mcafoportal/viewCompanyMasterData.do
+  - GST: https://services.gst.gov.in/services/searchtp
+  - Zauba: https://www.zaubacorp.com/company-search
+  - Screener: https://www.screener.in
+  - Tofler: https://www.tofler.in
+For listed companies add BSE and NSE links.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SYSTEM 4 — STALENESS DETECTION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-For every financial/numerical field, extract the data year into a separate "*DataYear" field.
+For every financial/numerical field, extract the data year into a "*DataYear" field.
 A field is STALE if its dataYear < ${staleYear}.
-Examples:
-  "annualRevenue": "₹2,400 Cr (FY2021)",  "annualRevenueDataYear": 2021  ← STALE
-  "employees": "45,000 (FY${currentYear})", "employeesDataYear": ${currentYear}  ← FRESH
-If you cannot determine the year, set the DataYear field to null.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SYSTEM 5 — UNKNOWN COMPANY DETECTION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-After completing the full report, self-assess your data confidence:
-Count how many fields have confidence "low" → set "lowConfidenceFieldCount"
-Set "reliabilityTier":
-  "verified"     = Listed/large company, 3+ high-confidence web sources found
-  "partial"      = Medium company, mix of web + training data, 1-2 high-confidence sources
-  "limited"      = Small/unlisted, mostly training knowledge, few or no web sources
-  "unverifiable" = Almost no public data found at all
-
-Set "reliabilityAlert":
-  "verified"     → null
-  "partial"      → "Some fields estimated from training data. Verify key financials independently before onboarding."
-  "limited"      → "LIMITED PUBLIC DATA: Manual verification strongly recommended. Do not rely solely on this report."
-  "unverifiable" → "INSUFFICIENT PUBLIC DATA: This assessment is largely estimated. Independent verification is mandatory."
+Set "reliabilityTier": "verified" | "partial" | "limited" | "unverifiable"
+Set "reliabilityAlert" appropriately based on tier.
 
 ═══════════════════════════════════════════════════════════════
-MULTI-LAYER RUBRIC SCORING (apply after credibility systems)
+MULTI-LAYER RUBRIC SCORING
 ═══════════════════════════════════════════════════════════════
 
 LAYER 1 — BANDS:
@@ -205,9 +232,11 @@ LAYER 3 — TRUST BONUSES:
             role: 'user',
             content: `Assess supplier: "${supplierName}"
 
-WEB SEARCH RESULTS:
+WEB SEARCH RESULTS (5 parallel searches including registry deep dive):
 ${recentContext}
 ${sourceIndexStr}
+
+${uploadedText ? `\nNOTE: The user has also uploaded a document with supplier information. Treat this as high-confidence primary source data and prioritise it over web search results where they conflict.\n` : ''}
 
 Return ONLY valid JSON matching this exact structure. No markdown. No extra text:
 
@@ -240,6 +269,10 @@ Return ONLY valid JSON matching this exact structure. No markdown. No extra text
   "gstNumber": "GST or Not found",
   "gstConfidence": "high|low",
   "gstSourceId": null,
+  "charges": "Active charges / liens or None found",
+  "chargesSourceId": null,
+  "lastFilingDate": "Date or Not found",
+  "lastFilingSourceId": null,
   "certifications": [],
   "keyProducts": [],
   "majorClients": [],
@@ -249,7 +282,9 @@ Return ONLY valid JSON matching this exact structure. No markdown. No extra text
   "verifyLinks": [
     { "label": "Verify on MCA21", "url": "https://www.mca.gov.in/mcafoportal/viewCompanyMasterData.do", "description": "Check CIN, directors and filing status" },
     { "label": "GST Verification", "url": "https://services.gst.gov.in/services/searchtp", "description": "Verify GSTIN registration and status" },
-    { "label": "Company Search (Zauba)", "url": "https://www.zaubacorp.com/company-search", "description": "Cross-check directors, charges and financials" }
+    { "label": "Company Search (Zauba)", "url": "https://www.zaubacorp.com/company-search", "description": "Cross-check directors, charges and financials" },
+    { "label": "Screener.in", "url": "https://www.screener.in", "description": "Financial ratios, P&L, balance sheet" },
+    { "label": "Tofler", "url": "https://www.tofler.in", "description": "MCA filings, annual returns, charges" }
   ],
   "reliabilityTier": "verified|partial|limited|unverifiable",
   "reliabilityAlert": null,
@@ -354,10 +389,10 @@ Return ONLY valid JSON matching this exact structure. No markdown. No extra text
 
 Rules:
 - overallScore = 0 always (client calculates)
-- verdict = APPROVED always (client recalculates)  
+- verdict = APPROVED always (client recalculates)
 - status: green(≥65), amber(40-64), red(<40)
-- For news: copy the actual URL from the Tavily source into "url" field if available
 - NEVER invent CIN, GST, or phone numbers
+- Populate charges and lastFilingDate from registry search results where available
 - Return ONLY valid JSON`
           }
         ]
@@ -374,20 +409,19 @@ Rules:
     const cleaned = rawText.replace(/```json|```/g, '').trim()
     const result = JSON.parse(cleaned)
 
-    // Attach source map so client can resolve SRCxx → full URL + domain
     result.sourceIndex = sourceIndex
+    result.deepSearch = !!deepSearch
+    result.hasUploadedDoc = !!(uploadedText && uploadedText.trim().length > 0)
 
-    // Strategy 4: server-side staleness — compute staleFields array
+    // Staleness detection
+    const staleYear2 = currentYear - 2
     const staleFields = []
-    if (result.annualRevenueDataYear && result.annualRevenueDataYear < staleYear) {
+    if (result.annualRevenueDataYear && result.annualRevenueDataYear < staleYear2)
       staleFields.push({ field: 'Annual Revenue', dataYear: result.annualRevenueDataYear })
-    }
-    if (result.employeesDataYear && result.employeesDataYear < staleYear) {
+    if (result.employeesDataYear && result.employeesDataYear < staleYear2)
       staleFields.push({ field: 'Employees', dataYear: result.employeesDataYear })
-    }
-    if (result.marketCapDataYear && result.marketCapDataYear < staleYear) {
+    if (result.marketCapDataYear && result.marketCapDataYear < staleYear2)
       staleFields.push({ field: 'Market Cap', dataYear: result.marketCapDataYear })
-    }
     result.staleFields = staleFields
 
     return res.status(200).json(result)
