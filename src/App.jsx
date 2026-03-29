@@ -3,6 +3,7 @@ import Header from './components/Header'
 import SearchBar from './components/SearchBar'
 import LoadingPanel from './components/LoadingPanel'
 import VerdictBanner from './components/VerdictBanner'
+import CredibilityBanner from './components/CredibilityBanner'
 import CompanyProfile from './components/CompanyProfile'
 import ScoreBreakdown from './components/ScoreBreakdown'
 import FactorsGrid from './components/FactorsGrid'
@@ -47,19 +48,12 @@ function App() {
         ])
         clearInterval(timer)
         setLoadingStep(5)
-        setTimeout(() => {
-          setLoading(false)
-          setResult(data1)
-          setResult2(data2)
-        }, 600)
+        setTimeout(() => { setLoading(false); setResult(data1); setResult2(data2) }, 600)
       } else {
         const data = await assessSupplier(supplierName)
         clearInterval(timer)
         setLoadingStep(5)
-        setTimeout(() => {
-          setLoading(false)
-          setResult(data)
-        }, 600)
+        setTimeout(() => { setLoading(false); setResult(data) }, 600)
       }
     } catch (err) {
       clearInterval(timer)
@@ -69,19 +63,15 @@ function App() {
   }
 
   const handleClear = () => {
-    setResult(null)
-    setResult2(null)
-    setSupplierName('')
-    setSupplier2Name('')
+    setResult(null); setResult2(null)
+    setSupplierName(''); setSupplier2Name('')
     setError('')
   }
 
   const handleToggleCompare = () => {
     setCompareMode(prev => !prev)
-    setResult(null)
-    setResult2(null)
-    setError('')
-    setSupplier2Name('')
+    setResult(null); setResult2(null)
+    setError(''); setSupplier2Name('')
   }
 
   return (
@@ -99,10 +89,7 @@ function App() {
         onToggleCompare={handleToggleCompare}
       />
 
-      <LoadingPanel
-        active={loading}
-        currentStep={loadingStep}
-      />
+      <LoadingPanel active={loading} currentStep={loadingStep} />
 
       {error && (
         <div style={{
@@ -118,57 +105,59 @@ function App() {
         </div>
       )}
 
-      {/* Compare mode results */}
+      {/* Compare mode */}
       {compareMode && result && result2 && (
         <>
           <div style={{
-            fontFamily: 'DM Mono, monospace',
-            fontSize: '10px',
-            color: 'var(--accent)',
-            letterSpacing: '2px',
-            textTransform: 'uppercase',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
+            fontFamily: 'DM Mono, monospace', fontSize: '10px',
+            color: 'var(--accent)', letterSpacing: '2px',
+            textTransform: 'uppercase', marginBottom: '20px',
+            display: 'flex', alignItems: 'center', gap: '10px'
           }}>
             <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
             ⇄ SUPPLIER COMPARISON REPORT
             <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
           </div>
           <CompareView result1={result} result2={result2} />
-          <ActionBar
-            result={result}
-            onReassess={handleSearch}
-            onClear={handleClear}
-          />
+          <ActionBar result={result} onReassess={handleSearch} onClear={handleClear} />
         </>
       )}
 
-      {/* Single mode results */}
+      {/* Single mode */}
       {!compareMode && result && (
         <>
+          {/* 1. Verdict */}
           <VerdictBanner
             supplierName={result.supplierName}
             score={result.overallScore}
             verdict={result.verdict}
             verdictReason={result.verdictReason}
           />
+
+          {/* 2. Credibility banner — all 5 strategies visible here */}
+          <CredibilityBanner data={result} />
+
+          {/* 3. Company profile with confidence dots + source chips */}
           <CompanyProfile data={result} />
+
+          {/* 4. AI summary */}
           <SummaryBox summary={result.summary} />
+
+          {/* 5. Score breakdown with rubric */}
           <ScoreBreakdown
             factors={result.factors}
             overallScore={result.overallScore}
             redFlags={result.redFlags || []}
             trustBonuses={result.trustBonuses || []}
           />
+
+          {/* 6. Factor cards with confidence + source */}
           <FactorsGrid factors={result.factors} />
+
+          {/* 7. News with real URLs */}
           <NewsSection news={result.news} />
-          <ActionBar
-            result={result}
-            onReassess={handleSearch}
-            onClear={handleClear}
-          />
+
+          <ActionBar result={result} onReassess={handleSearch} onClear={handleClear} />
         </>
       )}
     </div>
