@@ -1,5 +1,7 @@
-function InfoItem({ label, value, isLink }) {
-  const isMissing = !value || value === 'Not found' || value === 'N/A' || value === '' || value.startsWith('Unverified')
+import { ConfidenceDot, SourceChip, StaleBadge } from './CredibilityBanner'
+
+function InfoItem({ label, value, isLink, confidence, sourceId, sourceMap, stale, dataYear }) {
+  const isMissing = !value || value === 'Not found' || value === 'N/A' || value === ''
 
   const textStyle = {
     fontSize: '13px',
@@ -21,8 +23,11 @@ function InfoItem({ label, value, isLink }) {
       }}>
         {label}
       </div>
-      <div style={textStyle}>
-        {value || 'Not found'}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '2px' }}>
+        <span style={textStyle}>{value || 'Not found'}</span>
+        {!isMissing && confidence && <ConfidenceDot confidence={confidence} />}
+        {!isMissing && sourceId && sourceMap && <SourceChip sourceId={sourceId} sourceMap={sourceMap} />}
+        {stale && dataYear && <StaleBadge field={label} dataYear={dataYear} />}
       </div>
     </div>
   )
@@ -40,7 +45,8 @@ function InfoItem({ label, value, isLink }) {
 }
 
 function TagList({ items, color }) {
-  if (!items || items.length === 0) return <span style={{ fontSize: '13px', color: 'var(--text3)', fontStyle: 'italic' }}>Not found</span>
+  if (!items || items.length === 0)
+    return <span style={{ fontSize: '13px', color: 'var(--text3)', fontStyle: 'italic' }}>Not found</span>
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
       {items.map((item, i) => (
@@ -62,6 +68,11 @@ function TagList({ items, color }) {
 }
 
 function CompanyProfile({ data }) {
+  const sourceMap = data.sourceMap || {}
+  const staleSet = new Set((data.staleFields || []).map(s => s.field))
+  const staleYearMap = {}
+  ;(data.staleFields || []).forEach(s => { staleYearMap[s.field] = s.dataYear })
+
   const supplierTypeColor = {
     'Large Enterprise': 'var(--green)',
     'SME':              'var(--accent)',
@@ -70,7 +81,6 @@ function CompanyProfile({ data }) {
     'Startup':          'var(--accent2)'
   }
 
-  // Filter out board members that have no real data
   const validBoardMembers = (data.boardMembers || []).filter(m =>
     m.name && m.name !== 'Not found' && m.name !== 'Not publicly available' && m.name.trim() !== ''
   )
@@ -102,7 +112,6 @@ function CompanyProfile({ data }) {
         }}>
           🏢 COMPANY PROFILE
         </div>
-
         {data.supplierType && (
           <span style={{
             fontFamily: 'DM Mono, monospace',
@@ -127,14 +136,32 @@ function CompanyProfile({ data }) {
         paddingBottom: '24px',
         borderBottom: '1px solid var(--border)'
       }}>
-        <InfoItem label="Headquarters"      value={data.headquarters}    />
+        <InfoItem label="Headquarters"   value={data.headquarters} />
         <InfoItem label="Registered Office" value={data.registeredOffice} />
-        <InfoItem label="Employees"         value={data.employees}        />
-        <InfoItem label="Founded"           value={data.founded}          />
-        <InfoItem label="Annual Revenue"    value={data.annualRevenue}    />
-        <InfoItem label="Market Cap"        value={data.marketCap}        />
-        <InfoItem label="Stock Exchange"    value={data.stockExchange}    />
-        <InfoItem label="Parent Company"    value={data.parentCompany}    />
+        <InfoItem
+          label="Employees"
+          value={data.employees}
+          stale={staleSet.has('Employees')}
+          dataYear={staleYearMap['Employees']}
+        />
+        <InfoItem label="Founded" value={data.founded} />
+        <InfoItem
+          label="Annual Revenue"
+          value={data.annualRevenue}
+          confidence={data.annualRevenueConfidence}
+          sourceId={data.annualRevenueSourceId}
+          sourceMap={sourceMap}
+          stale={staleSet.has('Annual Revenue')}
+          dataYear={staleYearMap['Annual Revenue']}
+        />
+        <InfoItem
+          label="Market Cap"
+          value={data.marketCap}
+          stale={staleSet.has('Market Cap')}
+          dataYear={staleYearMap['Market Cap']}
+        />
+        <InfoItem label="Stock Exchange" value={data.stockExchange} />
+        <InfoItem label="Parent Company" value={data.parentCompany} />
       </div>
 
       {/* Registration Info */}
@@ -146,24 +173,32 @@ function CompanyProfile({ data }) {
         paddingBottom: '24px',
         borderBottom: '1px solid var(--border)'
       }}>
-        <InfoItem label="CIN Number"     value={data.cin}          />
-        <InfoItem label="GST Number"     value={data.gstNumber}    />
-        <InfoItem label="Udyam Number"   value={data.udyamNumber}  />
-        <InfoItem label="Website"        value={data.website}      isLink />
-        <InfoItem label="LinkedIn"       value={data.linkedin}     isLink />
-        <InfoItem label="Contact Email"  value={data.contactEmail} />
-        <InfoItem label="Contact Phone"  value={data.contactPhone} />
+        <InfoItem
+          label="CIN Number"
+          value={data.cin}
+          confidence={data.cinConfidence}
+          sourceId={data.cinSourceId}
+          sourceMap={sourceMap}
+        />
+        <InfoItem
+          label="GST Number"
+          value={data.gstNumber}
+          confidence={data.gstConfidence}
+          sourceId={data.gstSourceId}
+          sourceMap={sourceMap}
+        />
+        <InfoItem label="Udyam Number"  value={data.udyamNumber} />
+        <InfoItem label="Website"       value={data.website}      isLink />
+        <InfoItem label="LinkedIn"      value={data.linkedin}     isLink />
+        <InfoItem label="Contact Email" value={data.contactEmail} />
+        <InfoItem label="Contact Phone" value={data.contactPhone} />
       </div>
 
-      {/* Key Products & Services */}
+      {/* Key Products */}
       <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border)' }}>
         <div style={{
-          fontFamily: 'DM Mono, monospace',
-          fontSize: '10px',
-          color: 'var(--text3)',
-          letterSpacing: '1.5px',
-          textTransform: 'uppercase',
-          marginBottom: '12px'
+          fontFamily: 'DM Mono, monospace', fontSize: '10px', color: 'var(--text3)',
+          letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '12px'
         }}>
           🛠 KEY PRODUCTS & SERVICES
         </div>
@@ -173,12 +208,8 @@ function CompanyProfile({ data }) {
       {/* Certifications */}
       <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border)' }}>
         <div style={{
-          fontFamily: 'DM Mono, monospace',
-          fontSize: '10px',
-          color: 'var(--text3)',
-          letterSpacing: '1.5px',
-          textTransform: 'uppercase',
-          marginBottom: '12px'
+          fontFamily: 'DM Mono, monospace', fontSize: '10px', color: 'var(--text3)',
+          letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '12px'
         }}>
           🏅 CERTIFICATIONS
         </div>
@@ -189,12 +220,8 @@ function CompanyProfile({ data }) {
       {data.majorClients && data.majorClients.length > 0 && (
         <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border)' }}>
           <div style={{
-            fontFamily: 'DM Mono, monospace',
-            fontSize: '10px',
-            color: 'var(--text3)',
-            letterSpacing: '1.5px',
-            textTransform: 'uppercase',
-            marginBottom: '12px'
+            fontFamily: 'DM Mono, monospace', fontSize: '10px', color: 'var(--text3)',
+            letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '12px'
           }}>
             🤝 MAJOR CLIENTS
           </div>
@@ -205,16 +232,11 @@ function CompanyProfile({ data }) {
       {/* Board of Directors */}
       <div style={{ marginBottom: validBoardMembers.length > 0 ? '20px' : '0' }}>
         <div style={{
-          fontFamily: 'DM Mono, monospace',
-          fontSize: '10px',
-          color: 'var(--text3)',
-          letterSpacing: '1.5px',
-          textTransform: 'uppercase',
-          marginBottom: '14px'
+          fontFamily: 'DM Mono, monospace', fontSize: '10px', color: 'var(--text3)',
+          letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '14px'
         }}>
           👥 BOARD OF DIRECTORS
         </div>
-
         {validBoardMembers.length > 0 ? (
           <div style={{
             display: 'grid',
@@ -235,31 +257,23 @@ function CompanyProfile({ data }) {
                   width: '36px', height: '36px',
                   borderRadius: '50%',
                   background: 'linear-gradient(135deg, var(--accent), var(--accent2))',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontFamily: 'Syne, sans-serif',
-                  fontWeight: '700',
-                  fontSize: '13px',
-                  color: '#fff',
-                  flexShrink: 0
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'Syne, sans-serif', fontWeight: '700', fontSize: '13px',
+                  color: '#fff', flexShrink: 0
                 }}>
                   {member.name?.charAt(0)}
                 </div>
-                <div>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontFamily: 'Syne, sans-serif',
-                    fontSize: '13px',
-                    fontWeight: '700',
-                    marginBottom: '2px'
+                    display: 'flex', alignItems: 'center', gap: '4px',
+                    fontFamily: 'Syne, sans-serif', fontSize: '13px',
+                    fontWeight: '700', marginBottom: '2px'
                   }}>
                     {member.name}
+                    {member.confidence && <ConfidenceDot confidence={member.confidence} />}
+                    {member.sourceId && <SourceChip sourceId={member.sourceId} sourceMap={sourceMap} />}
                   </div>
-                  <div style={{
-                    fontSize: '11px',
-                    color: 'var(--text3)',
-                    fontWeight: '300'
-                  }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text3)', fontWeight: '300' }}>
                     {member.designation}
                   </div>
                 </div>
@@ -273,7 +287,7 @@ function CompanyProfile({ data }) {
         )}
       </div>
 
-      {/* Data Warnings — only if present */}
+      {/* Data Warnings */}
       {data.dataWarnings?.length > 0 && (
         <div style={{
           marginTop: '20px',
@@ -283,22 +297,15 @@ function CompanyProfile({ data }) {
           padding: '14px 16px'
         }}>
           <div style={{
-            fontFamily: 'DM Mono, monospace',
-            fontSize: '10px',
-            color: 'var(--amber)',
-            letterSpacing: '1px',
-            marginBottom: '8px'
+            fontFamily: 'DM Mono, monospace', fontSize: '10px', color: 'var(--amber)',
+            letterSpacing: '1px', marginBottom: '8px'
           }}>
             ⚠ DATA NOTES
           </div>
           {data.dataWarnings.map((w, i) => (
             <div key={i} style={{
-              fontSize: '12px',
-              color: 'var(--text2)',
-              marginBottom: '4px',
-              display: 'flex',
-              gap: '8px',
-              fontWeight: '300'
+              fontSize: '12px', color: 'var(--text2)', marginBottom: '4px',
+              display: 'flex', gap: '8px', fontWeight: '300'
             }}>
               <span style={{ color: 'var(--amber)', flexShrink: 0 }}>—</span>
               {w}
