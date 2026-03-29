@@ -84,9 +84,34 @@ function NewsSection({ news }) {
             <div style={{
               fontFamily: 'DM Mono, monospace',
               fontSize: '10px',
-              color: 'var(--text3)'
+              color: 'var(--text3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              flexWrap: 'wrap'
             }}>
-              {item.source}
+              <span>{item.source}</span>
+              {item.url && (
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    color: 'var(--accent, #6366f1)',
+                    textDecoration: 'none',
+                    fontSize: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    opacity: 0.8,
+                    transition: 'opacity 0.15s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '0.8'}
+                >
+                  {'\u2197'} Read article
+                </a>
+              )}
             </div>
           </div>
 

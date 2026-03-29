@@ -1,62 +1,67 @@
-function ConfidenceBadge({ level }) {
-  const config = {
-    high:   { color: 'var(--green)', bg: 'var(--green-dim)',  label: '● High Confidence'   },
-    medium: { color: 'var(--amber)', bg: 'var(--amber-dim)',  label: '◐ Medium Confidence' },
-    low:    { color: 'var(--red)',   bg: 'var(--red-dim)',    label: '○ Low Confidence'    }
+function InfoItem({ label, value, isLink }) {
+  const isMissing = !value || value === 'Not found' || value === 'N/A' || value === '' || value.startsWith('Unverified')
+
+  const textStyle = {
+    fontSize: '13px',
+    color: isMissing ? 'var(--text3)' : isLink ? 'var(--accent)' : 'var(--text)',
+    fontWeight: isMissing ? '300' : '500',
+    fontStyle: isMissing ? 'italic' : 'normal',
+    wordBreak: 'break-word',
+    textDecoration: isLink && !isMissing ? 'underline' : 'none'
   }
-  const c = config[level] || config.low
-  return (
-    <span style={{
-      fontFamily: 'DM Mono, monospace',
-      fontSize: '10px',
-      color: c.color,
-      background: c.bg,
-      padding: '2px 8px',
-      borderRadius: '4px',
-      letterSpacing: '0.3px'
-    }}>
-      {c.label}
-    </span>
-  )
-}
 
-function InfoItem({ label, value, confidence }) {
-  const isMissing = !value ||
-    value === 'Not found' ||
-    value === 'N/A' ||
-    value.startsWith('Unverified')
-
-  return (
+  const inner = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
       <div style={{
         fontFamily: 'DM Mono, monospace',
         fontSize: '10px',
         color: 'var(--text3)',
         letterSpacing: '1px',
-        textTransform: 'uppercase',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px'
+        textTransform: 'uppercase'
       }}>
         {label}
-        {confidence && <ConfidenceBadge level={confidence} />}
       </div>
-      <div style={{
-        fontSize: '13px',
-        color: isMissing ? 'var(--text3)' : 'var(--text)',
-        fontWeight: isMissing ? '300' : '500',
-        fontStyle: isMissing ? 'italic' : 'normal',
-        wordBreak: 'break-word'
-      }}>
+      <div style={textStyle}>
         {value || 'Not found'}
       </div>
+    </div>
+  )
+
+  if (isLink && !isMissing) {
+    const href = value.startsWith('http') ? value : `https://${value}`
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+        {inner}
+      </a>
+    )
+  }
+
+  return inner
+}
+
+function TagList({ items, color }) {
+  if (!items || items.length === 0) return <span style={{ fontSize: '13px', color: 'var(--text3)', fontStyle: 'italic' }}>Not found</span>
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+      {items.map((item, i) => (
+        <span key={i} style={{
+          fontFamily: 'DM Mono, monospace',
+          fontSize: '11px',
+          padding: '4px 10px',
+          borderRadius: '20px',
+          background: color ? `${color}15` : 'var(--surface2)',
+          color: color || 'var(--text2)',
+          border: `1px solid ${color ? `${color}30` : 'var(--border)'}`,
+          fontWeight: '500'
+        }}>
+          {item}
+        </span>
+      ))}
     </div>
   )
 }
 
 function CompanyProfile({ data }) {
-  const dc = data.dataConfidence || {}
-
   const supplierTypeColor = {
     'Large Enterprise': 'var(--green)',
     'SME':              'var(--accent)',
@@ -64,6 +69,11 @@ function CompanyProfile({ data }) {
     'Micro Enterprise': 'var(--amber)',
     'Startup':          'var(--accent2)'
   }
+
+  // Filter out board members that have no real data
+  const validBoardMembers = (data.boardMembers || []).filter(m =>
+    m.name && m.name !== 'Not found' && m.name !== 'Not publicly available' && m.name.trim() !== ''
+  )
 
   return (
     <div style={{
@@ -74,7 +84,7 @@ function CompanyProfile({ data }) {
       marginBottom: '24px'
     }}>
 
-      {/* Header row */}
+      {/* Header */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -93,27 +103,22 @@ function CompanyProfile({ data }) {
           🏢 COMPANY PROFILE
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          {/* Supplier type badge */}
-          {data.supplierType && (
-            <span style={{
-              fontFamily: 'DM Mono, monospace',
-              fontSize: '10px',
-              color: supplierTypeColor[data.supplierType] || 'var(--text2)',
-              background: 'var(--surface2)',
-              border: `1px solid ${supplierTypeColor[data.supplierType] || 'var(--border)'}`,
-              padding: '3px 10px',
-              borderRadius: '20px'
-            }}>
-              {data.supplierType}
-            </span>
-          )}
-          {/* Overall data confidence */}
-          {dc.overall && <ConfidenceBadge level={dc.overall} />}
-        </div>
+        {data.supplierType && (
+          <span style={{
+            fontFamily: 'DM Mono, monospace',
+            fontSize: '10px',
+            color: supplierTypeColor[data.supplierType] || 'var(--text2)',
+            background: 'var(--surface2)',
+            border: `1px solid ${supplierTypeColor[data.supplierType] || 'var(--border)'}`,
+            padding: '3px 10px',
+            borderRadius: '20px'
+          }}>
+            {data.supplierType}
+          </span>
+        )}
       </div>
 
-      {/* Info Grid */}
+      {/* Core Info Grid */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
@@ -122,120 +127,156 @@ function CompanyProfile({ data }) {
         paddingBottom: '24px',
         borderBottom: '1px solid var(--border)'
       }}>
-        <InfoItem label="Headquarters"     value={data.headquarters}  confidence={null} />
-        <InfoItem label="Employees"        value={data.employees}     confidence={dc.employees} />
-        <InfoItem label="Founded"          value={data.founded}       confidence={null} />
-        <InfoItem label="CIN Number"       value={data.cin}           confidence={dc.cin} />
-        <InfoItem label="GST Number"       value={data.gstNumber}     confidence={null} />
-        <InfoItem label="Udyam Number"     value={data.udyamNumber}   confidence={null} />
-        <InfoItem label="Website"          value={data.website}       confidence={null} />
-        <InfoItem label="Contact Email"    value={data.contactEmail}  confidence={null} />
-        <InfoItem label="Contact Phone"    value={data.contactPhone}  confidence={null} />
+        <InfoItem label="Headquarters"      value={data.headquarters}    />
+        <InfoItem label="Registered Office" value={data.registeredOffice} />
+        <InfoItem label="Employees"         value={data.employees}        />
+        <InfoItem label="Founded"           value={data.founded}          />
+        <InfoItem label="Annual Revenue"    value={data.annualRevenue}    />
+        <InfoItem label="Market Cap"        value={data.marketCap}        />
+        <InfoItem label="Stock Exchange"    value={data.stockExchange}    />
+        <InfoItem label="Parent Company"    value={data.parentCompany}    />
       </div>
 
-      {/* Board Members */}
-      <div style={{ marginBottom: '20px' }}>
+      {/* Registration Info */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+        gap: '20px',
+        marginBottom: '24px',
+        paddingBottom: '24px',
+        borderBottom: '1px solid var(--border)'
+      }}>
+        <InfoItem label="CIN Number"     value={data.cin}          />
+        <InfoItem label="GST Number"     value={data.gstNumber}    />
+        <InfoItem label="Udyam Number"   value={data.udyamNumber}  />
+        <InfoItem label="Website"        value={data.website}      isLink />
+        <InfoItem label="LinkedIn"       value={data.linkedin}     isLink />
+        <InfoItem label="Contact Email"  value={data.contactEmail} />
+        <InfoItem label="Contact Phone"  value={data.contactPhone} />
+      </div>
+
+      {/* Key Products & Services */}
+      <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border)' }}>
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '14px'
+          fontFamily: 'DM Mono, monospace',
+          fontSize: '10px',
+          color: 'var(--text3)',
+          letterSpacing: '1.5px',
+          textTransform: 'uppercase',
+          marginBottom: '12px'
         }}>
+          🛠 KEY PRODUCTS & SERVICES
+        </div>
+        <TagList items={data.keyProducts} color="var(--accent)" />
+      </div>
+
+      {/* Certifications */}
+      <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{
+          fontFamily: 'DM Mono, monospace',
+          fontSize: '10px',
+          color: 'var(--text3)',
+          letterSpacing: '1.5px',
+          textTransform: 'uppercase',
+          marginBottom: '12px'
+        }}>
+          🏅 CERTIFICATIONS
+        </div>
+        <TagList items={data.certifications} color="var(--green)" />
+      </div>
+
+      {/* Major Clients */}
+      {data.majorClients && data.majorClients.length > 0 && (
+        <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border)' }}>
           <div style={{
             fontFamily: 'DM Mono, monospace',
             fontSize: '10px',
             color: 'var(--text3)',
             letterSpacing: '1.5px',
-            textTransform: 'uppercase'
+            textTransform: 'uppercase',
+            marginBottom: '12px'
           }}>
-            BOARD OF DIRECTORS
+            🤝 MAJOR CLIENTS
           </div>
-          {dc.boardMembers && <ConfidenceBadge level={dc.boardMembers} />}
+          <TagList items={data.majorClients} color="var(--amber)" />
+        </div>
+      )}
+
+      {/* Board of Directors */}
+      <div style={{ marginBottom: validBoardMembers.length > 0 ? '20px' : '0' }}>
+        <div style={{
+          fontFamily: 'DM Mono, monospace',
+          fontSize: '10px',
+          color: 'var(--text3)',
+          letterSpacing: '1.5px',
+          textTransform: 'uppercase',
+          marginBottom: '14px'
+        }}>
+          👥 BOARD OF DIRECTORS
         </div>
 
-        {data.boardMembers?.length > 0 ? (
+        {validBoardMembers.length > 0 ? (
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
             gap: '10px'
           }}>
-            {data.boardMembers.map((member, i) => {
-              const isUnknown = !member.name ||
-                member.name === 'Not found' ||
-                member.name === 'Not publicly available'
-              return (
-                <div key={i} style={{
+            {validBoardMembers.map((member, i) => (
+              <div key={i} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                background: 'var(--surface2)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                padding: '12px 14px'
+              }}>
+                <div style={{
+                  width: '36px', height: '36px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, var(--accent), var(--accent2))',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '12px',
-                  background: 'var(--surface2)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '10px',
-                  padding: '12px 14px',
-                  opacity: isUnknown ? 0.5 : 1
+                  justifyContent: 'center',
+                  fontFamily: 'Syne, sans-serif',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  color: '#fff',
+                  flexShrink: 0
                 }}>
+                  {member.name?.charAt(0)}
+                </div>
+                <div>
                   <div style={{
-                    width: '36px', height: '36px',
-                    borderRadius: '50%',
-                    background: isUnknown
-                      ? 'var(--border2)'
-                      : 'linear-gradient(135deg, var(--accent), var(--accent2))',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
                     fontFamily: 'Syne, sans-serif',
-                    fontWeight: '700',
                     fontSize: '13px',
-                    color: '#fff',
-                    flexShrink: 0
+                    fontWeight: '700',
+                    marginBottom: '2px'
                   }}>
-                    {isUnknown ? '?' : member.name?.charAt(0)}
+                    {member.name}
                   </div>
-                  <div>
-                    <div style={{
-                      fontFamily: 'Syne, sans-serif',
-                      fontSize: '13px',
-                      fontWeight: '700',
-                      marginBottom: '2px'
-                    }}>
-                      {member.name}
-                    </div>
-                    <div style={{
-                      fontSize: '11px',
-                      color: 'var(--text3)',
-                      fontWeight: '300'
-                    }}>
-                      {member.designation}
-                    </div>
-                    {member.confidence === 'low' && (
-                      <div style={{
-                        fontSize: '10px',
-                        color: 'var(--amber)',
-                        marginTop: '2px',
-                        fontFamily: 'DM Mono, monospace'
-                      }}>
-                        ⚠ unverified
-                      </div>
-                    )}
+                  <div style={{
+                    fontSize: '11px',
+                    color: 'var(--text3)',
+                    fontWeight: '300'
+                  }}>
+                    {member.designation}
                   </div>
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
         ) : (
-          <div style={{
-            fontSize: '13px',
-            color: 'var(--text3)',
-            fontStyle: 'italic'
-          }}>
+          <div style={{ fontSize: '13px', color: 'var(--text3)', fontStyle: 'italic' }}>
             Board information not publicly available
           </div>
         )}
       </div>
 
-      {/* Data Warnings */}
+      {/* Data Warnings — only if present */}
       {data.dataWarnings?.length > 0 && (
         <div style={{
+          marginTop: '20px',
           background: 'rgba(245,158,11,0.06)',
           border: '1px solid rgba(245,158,11,0.2)',
           borderRadius: '8px',
@@ -248,7 +289,7 @@ function CompanyProfile({ data }) {
             letterSpacing: '1px',
             marginBottom: '8px'
           }}>
-            ⚠ DATA VERIFICATION WARNINGS
+            ⚠ DATA NOTES
           </div>
           {data.dataWarnings.map((w, i) => (
             <div key={i} style={{
