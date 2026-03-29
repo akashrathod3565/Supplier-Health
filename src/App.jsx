@@ -41,7 +41,6 @@ function App() {
 
     try {
       if (compareMode) {
-        // Run both assessments in parallel
         const [data1, data2] = await Promise.all([
           assessSupplier(supplierName),
           assessSupplier(supplier2Name)
@@ -160,6 +159,8 @@ function App() {
           <ScoreBreakdown
             factors={result.factors}
             overallScore={result.overallScore}
+            redFlags={result.redFlags || []}
+            trustBonuses={result.trustBonuses || []}
           />
           <FactorsGrid factors={result.factors} />
           <NewsSection news={result.news} />
