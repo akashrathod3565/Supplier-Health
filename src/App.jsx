@@ -10,7 +10,7 @@
  */
 
 import { useState } from "react";
-import "./App.css";
+import "./index.css";
 
 // ── Model display config ────────────────────────────────────────────────────
 const MODEL_LABELS = {
